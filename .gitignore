@@ -1,0 +1,5 @@
+# Python-generated files
+__pycache__/
+.venv/
+interview.db
+.env
