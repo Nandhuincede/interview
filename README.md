@@ -122,4 +122,4 @@ Then open: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReportGeneratorAgent** — Generates final hiring report
 - **LangGraph Workflow** — Manages complete interview flow
 ![Graph](graph_image.png)
-![Sequence Diagram](images/ai_sequence%20diagram.drawio.png)
+![Sequence Diagram](images/aiintew5.drawio.png)
