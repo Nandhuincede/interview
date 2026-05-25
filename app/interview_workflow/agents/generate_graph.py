@@ -10,4 +10,4 @@ graph_image = flow.get_graph().draw_mermaid_png()
 with open("graph_image.png", "wb") as f:
     f.write(graph_image)
 
-print("Graph image generated successfully!")
+print("Graph image generating successfully !")

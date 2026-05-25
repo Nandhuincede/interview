@@ -50,7 +50,7 @@ class Conversation(Base):
     score = Column(Float, nullable=True)          # Score for candidate answers
     evaluation_json = Column(Text, nullable=True) # Full evaluation breakdown as JSON
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+    bloom_level = Column(String, nullable=True)   # NEW
     # Relationships
     session = relationship("InterviewSession", back_populates="conversations")
 

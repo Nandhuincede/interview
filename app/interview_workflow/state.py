@@ -18,7 +18,9 @@ class InterviewState(TypedDict):
     current_question: str
     current_difficulty: str # "easy", "medium", "hard"
     current_answer: str
-    
+    current_bloom_level:str
+    bloom_progression: List[str]
+    bloom_scores: Dict[str,float]
     # Loop control
     question_count: int
     max_questions: int

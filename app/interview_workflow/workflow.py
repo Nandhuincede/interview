@@ -1,8 +1,14 @@
+# backend/app/interview_workflow/workflow.py
 from typing import Dict, Any, Literal
 from langgraph.graph import StateGraph, START, END
 from app.interview_workflow.state import InterviewState
-from agents.nodes import check_completion_node, evaluate_answer_node, generate_question_node, generate_report_node, load_candidate
-
+from app.interview_workflow.agents.nodes import (
+    load_candidate,
+    generate_question_node,
+    evaluate_answer_node,
+    check_completion_node,
+    generate_report_node
+)
 
 
 def completion_router(state: InterviewState) -> Literal["generate_question", "generate_report"]:
@@ -24,13 +30,12 @@ def graph_flow():
     workflow.add_node("check_completion", check_completion_node)
     workflow.add_node("generate_report", generate_report_node)
 
-
     workflow.add_edge(START, "load_candidate")
     workflow.add_edge("load_candidate", "generate_question")
     workflow.add_edge("generate_question", "evaluate_answer")
     workflow.add_edge("evaluate_answer", "check_completion")
 
-    # Add Conditional Router Edge
+    # Conditional routing
     workflow.add_conditional_edges(
         "check_completion",
         completion_router,
@@ -43,5 +48,7 @@ def graph_flow():
     workflow.add_edge("generate_report", END)
 
     return workflow.compile()
-# Compile
+
+
+# Compile the graph
 interview_workflow_app = graph_flow()
