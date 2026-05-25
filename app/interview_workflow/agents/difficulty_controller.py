@@ -1,29 +1,22 @@
+# app/interview_workflow/agents/difficulty_controller.py
+
+
 class DifficultyControllerAgent:
     def adjust_difficulty(self, last_overall_score: float, current_difficulty: str) -> str:
         """
         Decides whether the next question should be easy, medium, or hard
-        based on the candidate's last answer evaluation score.
+        based on the candidate's last answer evaluation score (0–10 scale).
+
+        >= 7.5 → ramp up
+        <  5.0 → ramp down
+        5.0–7.4 → maintain
         """
-        current_difficulty = current_difficulty.lower()
-        
-        # High performance (>= 7.5): ramp up difficulty
+        current = current_difficulty.lower()
+
         if last_overall_score >= 7.5:
-            if current_difficulty == "easy":
-                return "medium"
-            elif current_difficulty == "medium":
-                return "hard"
-            else:
-                return "hard"
-                
-        # Low performance (< 5.0): lower the difficulty to assist the candidate
-        elif last_overall_score < 5.0:
-            if current_difficulty == "hard":
-                return "medium"
-            elif current_difficulty == "medium":
-                return "easy"
-            else:
-                return "easy"
-                
-        # Average performance (5.0 to 7.5): maintain current difficulty
-        else:
-            return current_difficulty
+            return {"easy": "medium", "medium": "hard"}.get(current, "hard")
+
+        if last_overall_score < 5.0:
+            return {"hard": "medium", "medium": "easy"}.get(current, "easy")
+
+        return current

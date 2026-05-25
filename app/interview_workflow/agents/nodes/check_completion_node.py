@@ -1,15 +1,14 @@
+# app/interview_workflow/agents/nodes/check_completion_node.py
 from app.interview_workflow.state import InterviewState
-from typing import Dict, Any, Literal
-def check_completion_node(state: InterviewState) -> Dict[str, Any]:
+
+
+async def check_completion_node(state: InterviewState) -> dict:
     """
-    Checks if the maximum question limit has been reached.
+    Checks whether the interview has reached max_questions.
+    The conditional edge in workflow.py reads state['is_completed'].
     """
     print("[LangGraph Node] check_completion")
-    count = state.get("question_count", 0)
-    max_q = state.get("max_questions", 5)
-    
-    is_completed = count >= max_q
-    
-    return {
-        "is_completed": is_completed
-    }
+
+    is_completed = state.get("question_count", 0) >= state.get("max_questions", 5)
+
+    return {"is_completed": is_completed}
