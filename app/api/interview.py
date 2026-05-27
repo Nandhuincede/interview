@@ -103,7 +103,24 @@ def build_state_from_db(session_id: str, db: Session) -> dict:
     }
     return state
 
+def _generate_and_save_question(state: dict, session: models.InterviewSession, db: Session) -> dict:
+    """Generate next question, synthesize TTS, persist to DB. Returns q_result."""
+    q_result = question_generator.generate(state)
+    question_text = q_result["current_question"]
 
+    audio_base64 = tts.text_to_speech_base64(question_text)
+
+    db.add(models.Conversation(
+        session_id=session.session_id,
+        interview_id=session.interview_id,
+        speaker_type="interviewer",
+        message_text=question_text,
+        bloom_level=q_result.get("bloom_level", "remember"),
+    ))
+    db.commit()
+
+    q_result["audio_base64"] = audio_base64
+    return q_result
 # Endpoints
 
 
@@ -158,25 +175,13 @@ def start_interview(payload: StartInterviewRequest, db: Session = Depends(get_db
         "history": []
     }
     
-    q_result = question_generator.generate(state)
-    first_q = q_result["current_question"]
     
     greeting = f"Welcome {candidate.name}! Thank you for attending the interview today for the {candidate.role} position. Are you ready to start the interview? Let's begin with your first question: "
-    full_message = greeting + first_q
-    
-    # Convert greeting + first question to base64 audio speech
-    audio_base64 = tts.text_to_speech_base64(full_message)
-    
-    # Save interviewer conversation to DB
-    db_conv = models.Conversation(
-        session_id=session.session_id,
-        interview_id=session.interview_id,
-        speaker_type="interviewer",
-        message_text=full_message
-    )
-    db.add(db_conv)
-    db.commit()
-    
+
+    q_result = _generate_and_save_question(state, session, db)
+    first_q = q_result["current_question"]
+    audio_base64 = q_result["audio_base64"]
+        
     return StartInterviewResponse(
         session_id=session.session_id,
         interview_id=session.interview_id,
@@ -309,22 +314,11 @@ def get_next_question(payload: StartInterviewRequest, db: Session = Depends(get_
         )
         
     # Generate the question using state (which holds the current adjusted difficulty)
-    q_result = question_generator.generate(state)
+    
+    q_result = _generate_and_save_question(state, session, db)
     next_q = q_result["current_question"]
     difficulty = q_result["current_difficulty"]
-    
-    # Synthesize text to speech base64 audio
-    audio_base64 = tts.text_to_speech_base64(next_q)
-    
-    # Store interviewer question in DB
-    db_conv = models.Conversation(
-        session_id=session.session_id,
-        interview_id=session.interview_id,
-        speaker_type="interviewer",
-        message_text=next_q
-    )
-    db.add(db_conv)
-    db.commit()
+    audio_base64 = q_result["audio_base64"]
     
     return NextQuestionResponse(
         question=next_q,
