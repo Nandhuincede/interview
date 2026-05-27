@@ -26,7 +26,7 @@ class ReportGeneratorAgent:
         if not history:
             return self._empty_report()
 
-        # ── Aggregate metrics ─────────────────────────────────────────────
+        #  Aggregate metrics 
         history_summary = []
         total_score = total_tech = total_comm = 0.0
         bloom_scores: dict[str, list[float]] = {}
@@ -62,7 +62,7 @@ class ReportGeneratorAgent:
             for level, scores in bloom_scores.items()
         }
 
-        # ── LLM report generation ─────────────────────────────────────────
+        # LLM report generation 
         system_prompt = (
             "You are an expert HR and senior technical evaluator using Bloom's Taxonomy.\n"
             "Generate a professional, detailed hiring evaluation report.\n"
@@ -129,7 +129,7 @@ class ReportGeneratorAgent:
             return self._fallback_report(avg_score, avg_tech, avg_comm, role,
                                          bloom_analysis, history_summary)
 
-    # ── Helpers ───────────────────────────────────────────────────────────
+    # Helpers 
 
     def _empty_report(self) -> dict:
         return {

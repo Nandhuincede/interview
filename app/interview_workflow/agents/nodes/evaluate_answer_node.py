@@ -43,10 +43,9 @@ async def evaluate_answer_node(state: InterviewState) -> dict:
             conversation_id=f"CONV_{uuid.uuid4().hex[:8].upper()}",
             session_id=state["session_id"],
             interview_id=state["interview_id"],
-            speaker="candidate",
-            message=answer,
-            question_id=state.get("current_question_id", ""),
-            timestamp=datetime.utcnow(),
+            speaker_type="candidate",
+            message=answer,  
+            bloom_level=state.get("current_bloom_level","remember"), 
         )
     )
     await db.commit()

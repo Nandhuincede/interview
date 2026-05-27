@@ -74,6 +74,7 @@ def build_state_from_db(session_id: str, db: Session) -> dict:
                 "answer": msg.message_text,
                 "score": msg.score or 0.0,
                 "difficulty": temp_difficulty,
+                "bloom_level":msg.bloom_level or "remember",
                 "evaluation": eval_dict
             })
             # The next question's difficulty was determined by the difficulty controller
@@ -97,6 +98,7 @@ def build_state_from_db(session_id: str, db: Session) -> dict:
         "question_count": q_count,
         "max_questions": 5,  # Standard limit
         "history": history,
+        "current_bloom_level": history[-1]["bloom_level"] if history else "remember",
         "is_completed": session.status == "completed"
     }
     return state
@@ -222,7 +224,8 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
         question_text, 
         transcription, 
         state["role"], 
-        state["skillset"]
+        state["skillset"],
+        state.get("current_bloom_level", "remember"),
     )
     overall_score = eval_result.get("overall_score", 0.0)
     

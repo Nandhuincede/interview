@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.interview_workflow.state import InterviewState
 from app.db.models import Candidate
-# from app.exceptions import CandidateNotFoundError
+from app.exceptions import CandidateNotFoundError
 
 
 def _ensure_list(value) -> list:

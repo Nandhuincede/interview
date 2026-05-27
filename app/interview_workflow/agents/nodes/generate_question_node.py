@@ -33,8 +33,7 @@ async def generate_question_node(state: InterviewState) -> dict:
             interview_id=state["interview_id"],
             speaker="agent",
             message=result["current_question"],
-            question_id=q_id,
-            timestamp=datetime.utcnow(),
+            bloom_level=state.get("current_bloom_level", "remember"),
         )
     )
     await db.commit()
