@@ -20,25 +20,40 @@ from app.schemas.conversation import ConversationResponse
 from app.services import tts, stt
 from app.interview_workflow.agents.question_generator import QuestionGeneratorAgent
 from app.interview_workflow.agents.reflection import ReflectionAgent
-from app.interview_workflow.agents.difficulty_controller import DifficultyControllerAgent
-from app.interview_workflow.agents.conversation_manager import ConversationManagerAgent
 from app.interview_workflow.agents.report_generator import ReportGeneratorAgent
 from app.interview_workflow.state import InterviewState
 from app.services.interview_service import interview_service
 router = APIRouter(prefix="/interview", tags=["Interview Flow"])
-
+ 
 # Instantiate Agents
-question_generator = QuestionGeneratorAgent()
-reflection_agent = ReflectionAgent()
-difficulty_controller = DifficultyControllerAgent()
-conversation_manager = ConversationManagerAgent()
-report_generator = ReportGeneratorAgent()
+# REPLACE with:
+_question_generator = None
+_reflection_agent = None
+_report_generator = None
+
+def get_question_generator():
+    global _question_generator
+    if _question_generator is None:
+        _question_generator = QuestionGeneratorAgent()
+    return _question_generator
+
+def get_reflection_agent():
+    global _reflection_agent
+    if _reflection_agent is None:
+        _reflection_agent = ReflectionAgent()
+    return _reflection_agent
+
+def get_report_generator():
+    global _report_generator
+    if _report_generator is None:
+        _report_generator = ReportGeneratorAgent()
+    return _report_generator
 
 
 
 def _generate_and_save_question(state: dict, session: models.InterviewSession, db: Session) -> dict:
     """Generate next question, synthesize TTS, persist to DB. Returns q_result."""
-    q_result = question_generator.generate(state)
+    q_result = get_question_generator.generate(state)
     question_text = q_result["current_question"]
 
     audio_base64 = tts.text_to_speech_base64(question_text)
@@ -156,7 +171,7 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
     question_text = raw_question
         
     # 2. Run Reflection Agent Evaluation
-    eval_result = reflection_agent.evaluate(
+    eval_result = get_reflection_agent.evaluate(
         question_text, 
         transcription, 
         state["role"], 
@@ -191,7 +206,7 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
         db.commit()
         
         # 4. Generate final report automatically
-        report_data = report_generator.generate_report(updated_state)
+        report_data = get_report_generator.generate_report(updated_state)
         
         # Save report to DB
         db_report = models.Report(
@@ -278,7 +293,7 @@ def end_interview_manually(payload: StartInterviewRequest, db: Session = Depends
         # Check if report already exists
         existing_report = db.query(models.Report).filter(models.Report.session_id == payload.session_id).first()
         if not existing_report:
-            report_data = report_generator.generate_report(state)
+            report_data = get_report_generator.generate_report(state)
             
             db_report = models.Report(
                 session_id=session.session_id,
@@ -307,7 +322,7 @@ def trigger_report_generation(payload: StartInterviewRequest, db: Session = Depe
         raise HTTPException(status_code=404, detail="Interview session not found")
         
     state = interview_service.build_state_from_db(payload.session_id, db)
-    report_data = report_generator.generate_report(state)
+    report_data = get_report_generator.generate_report(state)
     
     # Check if report already exists and update it, else create new
     db_report = db.query(models.Report).filter(models.Report.session_id == payload.session_id).first()
@@ -397,4 +412,4 @@ def evaluate_custom_answer(question: str, answer: str, role: str, skillset: str)
     """
     Direct endpoint to evaluate any raw question-answer pair.
     """
-    return reflection_agent.evaluate(question, answer, role, skillset)
+    return get_reflection_agent.evaluate(question, answer, role, skillset)
