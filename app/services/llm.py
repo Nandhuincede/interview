@@ -124,7 +124,15 @@ class MockChatModel:
             asked.add(match.group(1).strip())
         return asked
 
-    def invoke(self, messages: List[Any], response_format: Optional[Any] = None) -> MockLLMResponse:
+    def invoke(self, input: Any, config: Optional[Any] = None, **kwargs: Any) -> MockLLMResponse:
+        # Normalize input — LangChain may pass a list of messages or a dict
+        if isinstance(input, dict):
+            messages = input.get("messages", [])
+        elif isinstance(input, list):
+            messages = input
+        else:
+            messages = [input]
+
         prompt_text = ""
         for m in messages:
             if hasattr(m, "content"):
@@ -134,7 +142,7 @@ class MockChatModel:
             else:
                 prompt_text += str(m) + "\n"
 
-        # ── 1. QUESTION GENERATOR ─────────────────────────────────────────
+        # 1. QUESTION GENERATOR 
         if "generate" in prompt_text.lower() and "question" in prompt_text.lower():
             role = "Generic Developer"
             if "react developer" in prompt_text.lower():
@@ -185,7 +193,7 @@ class MockChatModel:
                 ),
             }))
 
-        # ── 2. REFLECTION / EVALUATION ────────────────────────────────────
+        # 2. REFLECTION / EVALUATION 
         elif (
             "evaluate" in prompt_text.lower()
             or "reflection" in prompt_text.lower()
@@ -214,7 +222,7 @@ class MockChatModel:
                 "bloom_level": bloom_level,
             }))
 
-        # ── 3. REPORT GENERATOR ───────────────────────────────────────────
+        # 3. REPORT GENERATOR 
         elif "report" in prompt_text.lower() or "evaluation report" in prompt_text.lower():
             return MockLLMResponse(json.dumps({
                 "overall_score":       8.0,
@@ -241,9 +249,17 @@ class MockChatModel:
                 ),
             }))
 
-        # ── Default ───────────────────────────────────────────────────────
+        # Default 
         return MockLLMResponse("Interesting response. Could you elaborate on that?")
+    def __or__(self, other: Any) -> Any:
+        """Support llm | other syntax."""
+        from langchain_core.runnables import RunnableLambda
+        return RunnableLambda(self.invoke) | other
 
+    def __ror__(self, other: Any) -> Any:
+        """Support prompt | llm syntax."""
+        from langchain_core.runnables import RunnableLambda
+        return other | RunnableLambda(self.invoke)
 
 # Module-level singleton so _asked state is never lost between get_llm() calls
 _mock_llm_instance: Optional[MockChatModel] = None
