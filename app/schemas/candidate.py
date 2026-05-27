@@ -3,7 +3,7 @@ from datetime import datetime
 
 class CandidateBase(BaseModel):
     name: str = Field(..., example="Alice Smith")
-    email: str = Field(..., example="alice@example.com")
+    email: EmailStr = Field(..., example="alice@example.com")
     phone: str = Field(..., example="+1234567890")
     qualification: str = Field(..., example="B.Tech in Computer Science")
     experience: str = Field(..., example="3 years")

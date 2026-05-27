@@ -26,7 +26,6 @@ from app.services.interview_service import interview_service
 router = APIRouter(prefix="/interview", tags=["Interview Flow"])
  
 # Instantiate Agents
-# REPLACE with:
 _question_generator = None
 _reflection_agent = None
 _report_generator = None

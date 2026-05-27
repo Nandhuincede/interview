@@ -24,7 +24,7 @@ async def generate_question_node(state: InterviewState) -> dict:
 
     q_id = f"Q_{uuid.uuid4().hex[:6].upper()}"
 
-    # ── Persist question to DB ────────────────────────────────────────────
+    #  Persist question to DB 
     db = state["db"]
     db.add(
         Conversation(
@@ -38,7 +38,7 @@ async def generate_question_node(state: InterviewState) -> dict:
     )
     await db.commit()
 
-    # ── Update state (graph will hit END after this node) ─────────────────
+    # ── Update state (graph will hit END after this node) 
     return {
         "current_question":    result["current_question"],
         "current_question_id": q_id,
