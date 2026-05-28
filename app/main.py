@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from app.config import settings
 from app.db.database import engine, Base
 from app.api import candidate, speech, interview
+from typing import Union
 
 # Initialize database tables on server startup (SQLite auto-creation)
 Base.metadata.create_all(bind=engine)
@@ -39,7 +40,7 @@ os.makedirs("app/static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.get("/")
-def serve_frontend():
+def serve_frontend() -> Union[FileResponse,dict]:
     """
     Serves the premium, self-contained AI interview dashboard.
     """

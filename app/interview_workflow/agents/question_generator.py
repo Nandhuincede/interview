@@ -1,10 +1,9 @@
-# app/interview_workflow/agents/question_generator.py
+
 import json
 from langchain_core.prompts import ChatPromptTemplate
 from app.services.llm import get_llm
+from app.interview_workflow.constants import BLOOM_ORDER
 
-
-BLOOM_ORDER = ["remember", "understand", "apply", "analyze", "evaluate", "create"]
 
 BLOOM_DESCRIPTIONS = {
     "remember":  "Ask recall-based questions about definitions, concepts, or facts.",
@@ -17,7 +16,7 @@ BLOOM_DESCRIPTIONS = {
 
 
 class QuestionGeneratorAgent:
-    def __init__(self):
+    def __init__(self) -> None:
         self.llm = get_llm()
 
     def generate(self, state: dict) -> dict:

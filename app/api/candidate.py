@@ -7,7 +7,7 @@ from app.schemas.candidate import CandidateCreate, CandidateResponse
 router = APIRouter(prefix="/candidate", tags=["Candidate"])
 
 @router.post("/register", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
-def register_candidate(candidate_in: CandidateCreate, db: Session = Depends(get_db)):
+def register_candidate(candidate_in: CandidateCreate, db: Session = Depends(get_db)) -> CandidateResponse:
     """
     Registers a new candidate, creates their profile, and returns a unique candidate_id.
     """

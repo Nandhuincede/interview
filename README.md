@@ -72,11 +72,11 @@ Copy and configure `.env` file:
 ```env
 HOST=127.0.0.1
 PORT=8000
-DATABASE_URL=sqlite:///./interview.db
+DATABASE_URL=your db url
 MAX_QUESTIONS=5
 
-GROQ_API_KEY=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
-SARVAM_API_KEY=sk_cqq6ecxj_lco9jwVsOL0HTUOdRvPh2skL
+GROQ_API_KEY=your_groq_api_key_here
+SARVAM_API_KEY=your_sarvam_api_key_here
 ```
 
 ---

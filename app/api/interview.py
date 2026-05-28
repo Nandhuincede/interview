@@ -20,93 +20,59 @@ from app.schemas.conversation import ConversationResponse
 from app.services import tts, stt
 from app.interview_workflow.agents.question_generator import QuestionGeneratorAgent
 from app.interview_workflow.agents.reflection import ReflectionAgent
-from app.interview_workflow.agents.difficulty_controller import DifficultyControllerAgent
-from app.interview_workflow.agents.conversation_manager import ConversationManagerAgent
 from app.interview_workflow.agents.report_generator import ReportGeneratorAgent
 from app.interview_workflow.state import InterviewState
-
+from app.services.interview_service import interview_service
 router = APIRouter(prefix="/interview", tags=["Interview Flow"])
-
+ 
 # Instantiate Agents
-question_generator = QuestionGeneratorAgent()
-reflection_agent = ReflectionAgent()
-difficulty_controller = DifficultyControllerAgent()
-conversation_manager = ConversationManagerAgent()
-report_generator = ReportGeneratorAgent()
+_question_generator = None
+_reflection_agent = None
+_report_generator = None
 
-# Helper to build current state dictionary from DB
-def build_state_from_db(session_id: str, db: Session) -> dict:
-    session = db.query(models.InterviewSession).filter(models.InterviewSession.session_id == session_id).first()
-    if not session:
-        raise HTTPException(status_code=404, detail="Interview session not found")
-        
-    candidate = db.query(models.Candidate).filter(models.Candidate.candidate_id == session.candidate_id).first()
-    if not candidate:
-        raise HTTPException(status_code=404, detail="Candidate profile not found")
-        
-    # Rebuild history from conversations
-    db_conversations = db.query(models.Conversation).filter(
-        models.Conversation.session_id == session_id
-    ).order_by(models.Conversation.created_at.asc()).all()
-    
-    history = []
-    current_difficulty = "easy"
-    
-    # Pair questions with answers
-    temp_question = None
-    temp_difficulty = "easy"
-    
-    for msg in db_conversations:
-        if msg.speaker_type == "interviewer":
-            temp_question = msg.message_text
-            # Look up difficulty in metadata or start with current
-        elif msg.speaker_type == "candidate" and temp_question is not None:
-            # We found a candidate reply to a question
-            eval_dict = {}
-            if msg.evaluation_json:
-                try:
-                    eval_dict = json.loads(msg.evaluation_json)
-                except Exception:
-                    pass
-            
-            history.append({
-                "question": temp_question,
-                "answer": msg.message_text,
-                "score": msg.score or 0.0,
-                "difficulty": temp_difficulty,
-                "evaluation": eval_dict
-            })
-            # The next question's difficulty was determined by the difficulty controller
-            if msg.score is not None:
-                temp_difficulty = difficulty_controller.adjust_difficulty(msg.score, temp_difficulty)
-            temp_question = None
-            
-    # Count how many interviewer questions have been asked
-    q_count = sum(1 for m in db_conversations if m.speaker_type == "interviewer")
-    
-    state = {
-        "candidate_id": candidate.candidate_id,
-        "name": candidate.name,
-        "role": candidate.role,
-        "experience": candidate.experience,
-        "qualification": candidate.qualification,
-        "skillset": candidate.skillset,
-        "session_id": session.session_id,
-        "interview_id": session.interview_id,
-        "current_difficulty": temp_difficulty,
-        "question_count": q_count,
-        "max_questions": 5,  # Standard limit
-        "history": history,
-        "is_completed": session.status == "completed"
-    }
-    return state
+def get_question_generator():
+    global _question_generator
+    if _question_generator is None:
+        _question_generator = QuestionGeneratorAgent()
+    return _question_generator
+
+def get_reflection_agent():
+    global _reflection_agent
+    if _reflection_agent is None:
+        _reflection_agent = ReflectionAgent()
+    return _reflection_agent
+
+def get_report_generator():
+    global _report_generator
+    if _report_generator is None:
+        _report_generator = ReportGeneratorAgent()
+    return _report_generator
 
 
+
+def _generate_and_save_question(state: dict, session: models.InterviewSession, db: Session) -> dict:
+    """Generate next question, synthesize TTS, persist to DB. Returns q_result."""
+    q_result = get_question_generator().generate(state)
+    question_text = q_result["current_question"]
+
+    audio_base64 = tts.text_to_speech_base64(question_text)
+
+    db.add(models.Conversation(
+        session_id=session.session_id,
+        interview_id=session.interview_id,
+        speaker_type="interviewer",
+        message_text=question_text,
+        bloom_level=q_result.get("bloom_level", "remember"),
+    ))
+    db.commit()
+
+    q_result["audio_base64"] = audio_base64
+    return q_result
 # Endpoints
 
 
 @router.post("/session", response_model=InterviewSessionResponse, status_code=status.HTTP_201_CREATED)
-def create_session(payload: InterviewSessionCreate, db: Session = Depends(get_db)):
+def create_session(payload: InterviewSessionCreate, db: Session = Depends(get_db))->InterviewSessionResponse:
     """
     Creates a new interview session for a candidate.
     """
@@ -128,7 +94,7 @@ def create_session(payload: InterviewSessionCreate, db: Session = Depends(get_db
     return session
 
 @router.post("/start", response_model=StartInterviewResponse)
-def start_interview(payload: StartInterviewRequest, db: Session = Depends(get_db)):
+def start_interview(payload: StartInterviewRequest, db: Session = Depends(get_db)) -> StartInterviewResponse:
     """
     Sets session status to active, generates a personalized greeting and the
     first technical question, synthesizes speech, and saves to conversations.
@@ -156,25 +122,13 @@ def start_interview(payload: StartInterviewRequest, db: Session = Depends(get_db
         "history": []
     }
     
-    q_result = question_generator.generate(state)
-    first_q = q_result["current_question"]
     
     greeting = f"Welcome {candidate.name}! Thank you for attending the interview today for the {candidate.role} position. Are you ready to start the interview? Let's begin with your first question: "
-    full_message = greeting + first_q
-    
-    # Convert greeting + first question to base64 audio speech
-    audio_base64 = tts.text_to_speech_base64(full_message)
-    
-    # Save interviewer conversation to DB
-    db_conv = models.Conversation(
-        session_id=session.session_id,
-        interview_id=session.interview_id,
-        speaker_type="interviewer",
-        message_text=full_message
-    )
-    db.add(db_conv)
-    db.commit()
-    
+
+    q_result = _generate_and_save_question(state, session, db)
+    first_q = q_result["current_question"]
+    audio_base64 = q_result["audio_base64"]
+        
     return StartInterviewResponse(
         session_id=session.session_id,
         interview_id=session.interview_id,
@@ -184,7 +138,7 @@ def start_interview(payload: StartInterviewRequest, db: Session = Depends(get_db
     )
 
 @router.post("/answer", response_model=AnswerResponse)
-def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
+def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)) ->AnswerResponse:
     """
     Accepts candidate's answer (via base64 microphone audio or text fallback),
     transcribes it, runs the reflection evaluator, checks completion, and saves to database.
@@ -200,7 +154,7 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
     transcription = stt.transcribe_audio_base64(payload.audio_base64, payload.text_fallback)
     
     # Load state from database to identify the question that was answered
-    state = build_state_from_db(payload.session_id, db)
+    state = interview_service.build_state_from_db(payload.session_id, db)
     
     # The last asked question is the most recent interviewer conversation
     last_interviewer_msg = db.query(models.Conversation).filter(
@@ -214,15 +168,14 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
     # Clean the question text (removing welcome greeting if it was the first question)
     raw_question = last_interviewer_msg.message_text
     question_text = raw_question
-    if "Let's begin with your first question:" in raw_question:
-        question_text = raw_question.split("Let's begin with your first question:")[-1].strip()
         
     # 2. Run Reflection Agent Evaluation
-    eval_result = reflection_agent.evaluate(
+    eval_result = get_reflection_agent().evaluate(
         question_text, 
         transcription, 
         state["role"], 
-        state["skillset"]
+        state["skillset"],
+        state.get("current_bloom_level", "remember"),
     )
     overall_score = eval_result.get("overall_score", 0.0)
     
@@ -239,7 +192,7 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
     db.commit()
     
     # Rebuild state after appending this answer to check completion
-    updated_state = build_state_from_db(payload.session_id, db)
+    updated_state = interview_service.build_state_from_db(payload.session_id, db)
     
     # 3. Check completion node logic
     # Reached question limit (configured at 5 for quick demo)
@@ -252,7 +205,7 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
         db.commit()
         
         # 4. Generate final report automatically
-        report_data = report_generator.generate_report(updated_state)
+        report_data = get_report_generator().generate_report(updated_state)
         
         # Save report to DB
         db_report = models.Report(
@@ -278,7 +231,7 @@ def submit_answer(payload: AnswerSubmit, db: Session = Depends(get_db)):
     )
 
 @router.post("/next-question", response_model=NextQuestionResponse)
-def get_next_question(payload: StartInterviewRequest, db: Session = Depends(get_db)):
+def get_next_question(payload: StartInterviewRequest, db: Session = Depends(get_db)) -> NextQuestionResponse:
     """
     Generates the next dynamic question based on history and difficulty,
     synthesizes it to speech, saves to DB, and returns it.
@@ -295,7 +248,7 @@ def get_next_question(payload: StartInterviewRequest, db: Session = Depends(get_
         )
         
     # Rebuild state from DB
-    state = build_state_from_db(payload.session_id, db)
+    state = interview_service.build_state_from_db(payload.session_id, db)
     
     # Verify completion again
     if len(state["history"]) >= state["max_questions"]:
@@ -306,22 +259,11 @@ def get_next_question(payload: StartInterviewRequest, db: Session = Depends(get_
         )
         
     # Generate the question using state (which holds the current adjusted difficulty)
-    q_result = question_generator.generate(state)
+    
+    q_result = _generate_and_save_question(state, session, db)
     next_q = q_result["current_question"]
     difficulty = q_result["current_difficulty"]
-    
-    # Synthesize text to speech base64 audio
-    audio_base64 = tts.text_to_speech_base64(next_q)
-    
-    # Store interviewer question in DB
-    db_conv = models.Conversation(
-        session_id=session.session_id,
-        interview_id=session.interview_id,
-        speaker_type="interviewer",
-        message_text=next_q
-    )
-    db.add(db_conv)
-    db.commit()
+    audio_base64 = q_result["audio_base64"]
     
     return NextQuestionResponse(
         question=next_q,
@@ -331,7 +273,7 @@ def get_next_question(payload: StartInterviewRequest, db: Session = Depends(get_
     )
 
 @router.post("/end", response_model=InterviewSessionResponse)
-def end_interview_manually(payload: StartInterviewRequest, db: Session = Depends(get_db)):
+def end_interview_manually(payload: StartInterviewRequest, db: Session = Depends(get_db))->InterviewSessionResponse:
     """
     Ends the interview session manually and generates the final report.
     """
@@ -345,12 +287,12 @@ def end_interview_manually(payload: StartInterviewRequest, db: Session = Depends
         db.commit()
         
         # Build state and generate final report
-        state = build_state_from_db(payload.session_id, db)
+        state = interview_service.build_state_from_db(payload.session_id, db)
         
         # Check if report already exists
         existing_report = db.query(models.Report).filter(models.Report.session_id == payload.session_id).first()
         if not existing_report:
-            report_data = report_generator.generate_report(state)
+            report_data = get_report_generator().generate_report(state)
             
             db_report = models.Report(
                 session_id=session.session_id,
@@ -370,7 +312,7 @@ def end_interview_manually(payload: StartInterviewRequest, db: Session = Depends
     return session
 
 @router.post("/report/generate", response_model=ReportResponse)
-def trigger_report_generation(payload: StartInterviewRequest, db: Session = Depends(get_db)):
+def trigger_report_generation(payload: StartInterviewRequest, db: Session = Depends(get_db))->ReportResponse:
     """
     Compiles/re-generates and saves the final interview report.
     """
@@ -378,8 +320,8 @@ def trigger_report_generation(payload: StartInterviewRequest, db: Session = Depe
     if not session:
         raise HTTPException(status_code=404, detail="Interview session not found")
         
-    state = build_state_from_db(payload.session_id, db)
-    report_data = report_generator.generate_report(state)
+    state = interview_service.build_state_from_db(payload.session_id, db)
+    report_data = get_report_generator().generate_report(state)
     
     # Check if report already exists and update it, else create new
     db_report = db.query(models.Report).filter(models.Report.session_id == payload.session_id).first()
@@ -427,7 +369,7 @@ def trigger_report_generation(payload: StartInterviewRequest, db: Session = Depe
     )
 
 @router.get("/report/{session_id}", response_model=ReportResponse)
-def get_interview_report(session_id: str, db: Session = Depends(get_db)):
+def get_interview_report(session_id: str, db: Session = Depends(get_db))-> ReportResponse:
     """
     Fetches the final interview evaluation report for a session from the DB.
     """
@@ -454,7 +396,7 @@ def get_interview_report(session_id: str, db: Session = Depends(get_db)):
     )
 
 @router.get("/conversation/{session_id}", response_model=List[ConversationResponse])
-def get_conversation_history(session_id: str, db: Session = Depends(get_db)):
+def get_conversation_history(session_id: str, db: Session = Depends(get_db))-> List[ConversationResponse]:
     """
     Retrieves full chronological dialogue history for the interview session.
     """
@@ -465,8 +407,8 @@ def get_conversation_history(session_id: str, db: Session = Depends(get_db)):
     return db_conversations
 
 @router.post("/reflection/evaluate")
-def evaluate_custom_answer(question: str, answer: str, role: str, skillset: str):
+def evaluate_custom_answer(question: str, answer: str, role: str, skillset: str)-> dict:
     """
     Direct endpoint to evaluate any raw question-answer pair.
     """
-    return reflection_agent.evaluate(question, answer, role, skillset)
+    return get_reflection_agent().evaluate(question, answer, role, skillset)

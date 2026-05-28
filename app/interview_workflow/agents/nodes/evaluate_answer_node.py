@@ -7,12 +7,12 @@ from app.interview_workflow.agents.reflection import ReflectionAgent
 from app.interview_workflow.agents.difficulty_controller import DifficultyControllerAgent
 from app.interview_workflow.agents.conversation_manager import ConversationManagerAgent
 from app.db.models import Conversation
+from app.interview_workflow.constants import BLOOM_ORDER
 
 reflection_agent         = ReflectionAgent()
 difficulty_controller    = DifficultyControllerAgent()
 conversation_manager     = ConversationManagerAgent()
 
-BLOOM_ORDER = ["remember", "understand", "apply", "analyze", "evaluate", "create"]
 
 
 async def evaluate_answer_node(state: InterviewState) -> dict:
@@ -36,22 +36,21 @@ async def evaluate_answer_node(state: InterviewState) -> dict:
     bloom_level  = state.get("current_bloom_level", "remember")
     difficulty   = state.get("current_difficulty", "easy")
 
-    # ── Persist candidate answer ──────────────────────────────────────────
+    # Persist candidate answer 
     db = state["db"]
     db.add(
         Conversation(
             conversation_id=f"CONV_{uuid.uuid4().hex[:8].upper()}",
             session_id=state["session_id"],
             interview_id=state["interview_id"],
-            speaker="candidate",
-            message=answer,
-            question_id=state.get("current_question_id", ""),
-            timestamp=datetime.utcnow(),
+            speaker_type="candidate",
+            message=answer,  
+            bloom_level=state.get("current_bloom_level","remember"), 
         )
     )
     await db.commit()
 
-    # ── Defaults (used if LLM call fails) ─────────────────────────────────
+    # Defaults (used if LLM call fails) 
     evaluation    = {}
     overall_score = 0.0
     next_difficulty = difficulty
@@ -63,10 +62,10 @@ async def evaluate_answer_node(state: InterviewState) -> dict:
         evaluation    = reflection_agent.evaluate(question, answer, role, skillset, bloom_level)
         overall_score = evaluation.get("overall_score", 0.0)
 
-        # ── Adaptive difficulty ───────────────────────────────────────────
+        # Adaptive difficulty 
         next_difficulty = difficulty_controller.adjust_difficulty(overall_score, difficulty)
 
-        # ── Adaptive Bloom level (v2 thresholds: score is 0–10) ───────────
+        # Adaptive Bloom level (v2 thresholds: score is 0–10) 
         # overall_score >= 8.5 → promote  (equivalent to v2's >=85 on 0–100 scale)
         # overall_score <  5.0 → demote
         idx = BLOOM_ORDER.index(bloom_level)
@@ -81,7 +80,7 @@ async def evaluate_answer_node(state: InterviewState) -> dict:
         print(f"[evaluate_answer_node Error] {e}")
         error = str(e)
 
-    # ── Append turn to history (bloom_level stored per turn) ─────────────
+    # Append turn to history (bloom_level stored per turn) 
     updated_history = conversation_manager.update_history(
         history    = state.get("history", []),
         question   = question,
@@ -94,7 +93,7 @@ async def evaluate_answer_node(state: InterviewState) -> dict:
 
     updated_scores = state.get("scores", []) + [overall_score]
 
-    # ── Update bloom_scores aggregate ────────────────────────────────────
+    # Update bloom_scores aggregate 
     bloom_scores = dict(state.get("bloom_scores", {}))
     prev = bloom_scores.get(bloom_level, [])
     if not isinstance(prev, list):

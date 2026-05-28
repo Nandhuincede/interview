@@ -1,13 +1,13 @@
 # app/interview_workflow/agents/nodes/load_candidate.py
 import json as _json
 from sqlalchemy import select
-
+from typing import Any
 from app.interview_workflow.state import InterviewState
 from app.db.models import Candidate
-# from app.exceptions import CandidateNotFoundError
+from app.exceptions import CandidateNotFoundError
 
 
-def _ensure_list(value) -> list:
+def _ensure_list(value: Any) -> list:
     """Coerce SQLite JSON columns (stored as strings) back to Python lists."""
     if value is None:
         return []

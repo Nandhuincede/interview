@@ -1,4 +1,3 @@
-# app/interview_workflow/agents/reflection.py
 import json
 import re
 from langchain_core.prompts import ChatPromptTemplate
@@ -6,7 +5,7 @@ from app.services.llm import get_llm
 
 
 class ReflectionAgent:
-    def __init__(self):
+    def __init__(self) -> None:
         self.llm = get_llm()
 
     def evaluate(
@@ -91,7 +90,7 @@ class ReflectionAgent:
             print(f"[ReflectionAgent Error] {e}")
             return self._fallback_scores(answer, bloom_level)
 
-    # ── Helpers ───────────────────────────────────────────────────────────
+    # Helpers 
 
     def _empty_response(self, bloom_level: str) -> dict:
         return {

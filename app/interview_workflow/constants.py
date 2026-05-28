@@ -1,0 +1,1 @@
+BLOOM_ORDER = ["remember", "understand", "apply", "analyze", "evaluate", "create"]
