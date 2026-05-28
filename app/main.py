@@ -39,8 +39,8 @@ os.makedirs("app/static", exist_ok=True)
 # Mount Static Files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-@app.get("/")
-def serve_frontend() -> Union[FileResponse,dict]:
+@app.get("/", response_model=None)
+def serve_frontend():
     """
     Serves the premium, self-contained AI interview dashboard.
     """
