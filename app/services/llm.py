@@ -2,7 +2,7 @@ import os
 import json
 import random
 import re
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Set
 from app.config import settings
 
 try:
@@ -37,7 +37,7 @@ class MockChatModel:
 
     BLOOM_ORDER = ["remember", "understand", "apply", "analyze", "evaluate", "create"]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._asked: set = set()
 
         self.questions_pool = {
@@ -114,7 +114,7 @@ class MockChatModel:
             return match.group(1).lower()
         return "remember"
 
-    def _extract_already_asked(self, prompt_text: str) -> set:
+    def _extract_already_asked(self, prompt_text: str) -> Set[str]:
         """
         Parse questions already listed in the conversation history section of the
         prompt so we never repeat them even across fresh MockChatModel instances.

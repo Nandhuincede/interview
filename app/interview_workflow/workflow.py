@@ -1,7 +1,7 @@
 # app/interview_workflow/workflow.py
 from typing import Literal
 from langgraph.graph import StateGraph, END
-
+from langgraph.graph.state import CompiledStateGraph
 from app.interview_workflow.state import InterviewState
 from app.interview_workflow.agents.nodes import (
     load_candidate,
@@ -12,7 +12,7 @@ from app.interview_workflow.agents.nodes import (
 )
 
 
-# ── Entry-point router ────────────────────────────────────────────────────────
+#  Entry-point router 
 
 def route_phase(state: InterviewState) -> str:
     """
@@ -40,7 +40,7 @@ def route_phase(state: InterviewState) -> str:
     raise ValueError(f"[route_phase] Unknown phase: '{phase}'")
 
 
-# ── Post-evaluation router ────────────────────────────────────────────────────
+# Post-evaluation router 
 
 def route_after_completion(state: InterviewState) -> str:
     """
@@ -54,9 +54,9 @@ def route_after_completion(state: InterviewState) -> str:
     return "generate_report" if state.get("is_completed", False) else "generate_question"
 
 
-# ── Graph builder ─────────────────────────────────────────────────────────────
+# Graph builder 
 
-def graph_flow():
+def graph_flow() -> CompiledStateGraph:
     g = StateGraph(InterviewState)
 
     # Register nodes

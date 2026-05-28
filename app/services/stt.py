@@ -3,8 +3,8 @@ import base64
 import tempfile
 import requests
 from app.config import settings
-
-def transcribe_audio_base64(audio_base64: str, text_fallback: str = None) -> str:
+from typing import Optional
+def transcribe_audio_base64(audio_base64: str, text_fallback: Optional[str] = None) -> str:
     """
     Decodes a base64 audio string, saves it to a temporary file, and sends it to
     an STT service (like Sarvam AI) to transcribe it into text.

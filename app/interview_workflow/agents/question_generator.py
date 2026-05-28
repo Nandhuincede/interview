@@ -16,7 +16,7 @@ BLOOM_DESCRIPTIONS = {
 
 
 class QuestionGeneratorAgent:
-    def __init__(self):
+    def __init__(self) -> None:
         self.llm = get_llm()
 
     def generate(self, state: dict) -> dict:

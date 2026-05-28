@@ -7,7 +7,7 @@ from app.services.llm import get_llm
 
 
 class ReportGeneratorAgent:
-    def __init__(self):
+    def __init__(self) -> None:
         self.llm = get_llm()
 
     def generate_report(self, state: dict) -> dict:

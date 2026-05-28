@@ -4,7 +4,7 @@ from sqlalchemy import Column, String, Integer, Float, Text, DateTime, ForeignKe
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
-def generate_uuid():
+def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 class Candidate(Base):

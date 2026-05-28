@@ -19,7 +19,7 @@ class GenerateSpeechResponse(BaseModel):
     audio_base64: str
 
 @router.post("/stt/transcribe", response_model=TranscribeResponse)
-def transcribe_speech(payload: TranscribeRequest):
+def transcribe_speech(payload: TranscribeRequest) -> TranscribeResponse:
     """
     Transcribes candidate's microphone audio (base64-encoded) to text.
     """
@@ -33,7 +33,7 @@ def transcribe_speech(payload: TranscribeRequest):
     return TranscribeResponse(transcription=text)
 
 @router.post("/tts/generate", response_model=GenerateSpeechResponse)
-def generate_speech(payload: GenerateSpeechRequest):
+def generate_speech(payload: GenerateSpeechRequest) -> GenerateSpeechResponse:
     """
     Synthesizes a generated question text into base64 encoded audio speech.
     """
